@@ -65,31 +65,129 @@ void erlcmd_send(char *response, size_t len)
 }
 
 
-void send_tag(const char *uid, size_t len) {
+void send_tag(const char *uid, size_t uid_len) {
     char resp[1024];
     int resp_index = sizeof(uint16_t); // Space for payload size
     ei_encode_version(resp, &resp_index);
 
     ei_encode_tuple_header(resp, &resp_index, 2);
     ei_encode_atom(resp, &resp_index, "tag");
-    ei_encode_binary(resp, &resp_index, uid, len);
+    ei_encode_binary(resp, &resp_index, uid, uid_len);
 
     erlcmd_send(resp, resp_index);
 }
 
+void send_ping() {
+    char resp[1024];
+    int resp_index = sizeof(uint16_t); // Space for payload size
+    ei_encode_version(resp, &resp_index);
+    ei_encode_tuple_header(resp, &resp_index, 1);
+    ei_encode_atom(resp, &resp_index, "ping");
+    erlcmd_send(resp, resp_index);
+}
+/*
+void send_tag(const char *uid, size_t uid_len, char *ndef, size_t ndef_len) {
+    char resp[1024];
+    int resp_index = sizeof(uint16_t); // Space for payload size
+    ei_encode_version(resp, &resp_index);
 
-int
-main(int argc, const char *argv[])
+    ei_encode_tuple_header(resp, &resp_index, 3);
+    ei_encode_atom(resp, &resp_index, "tag");
+    ei_encode_binary(resp, &resp_index, uid, uid_len);
+    ei_encode_binary(resp, &resp_index, ndef, ndef_len);
+
+    erlcmd_send(resp, resp_index);
+}
+*/
+int card_transmit(nfc_device *pnd, uint8_t * capdu, size_t capdulen, uint8_t * rapdu, size_t * rapdulen)
+{
+  size_t  szPos;
+  int retry = 3;
+  int res = 0;
+  while ((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1) < 0) && (retry > 0)) {
+    printf("RETRY\n");
+    nfc_perror(pnd, "nfc_initiator_transceive_bytes");
+    retry --;
+  };
+  if (retry == 0){
+    printf("command failed \n");
+    return -1;
+  }else
+    return 0;
+
+}
+
+
+int select_application_id(nfc_device *pnd) {
+    uint8_t rapdu[264];
+    size_t rapdulen = 264 ;
+    uint8_t select_application_apdu[12];
+    memcpy(select_application_apdu, "\x00\xA4\x04\x00\x07\xD2\x76\x00\x00\x85\x01\x01", 12);
+    return card_transmit(pnd, select_application_apdu, 12,rapdu, &rapdulen);
+}
+
+
+int select_ndef_file(nfc_device *pnd) {
+    uint8_t rapdu[264];
+    size_t rapdulen = sizeof(rapdu);
+    uint8_t select_ndef_file_apdu[7];
+    memcpy(select_ndef_file_apdu, "\x00\xA4\x00\x0C\x02\xE1\x04", 7);
+    return card_transmit(pnd, select_ndef_file_apdu, 7,rapdu, &rapdulen);
+}
+
+int read_ndef_file(nfc_device *pnd, uint8_t * rapdu) {
+    int res;
+    size_t rapdulen = 264;
+    uint8_t get_file_size_apdu[5];
+    memcpy(get_file_size_apdu, "\x00\xB0\x00\x00\x02", 5);
+    card_transmit(pnd,  get_file_size_apdu, 5, rapdu, &rapdulen );
+    rapdulen = rapdu[1];
+    int size = rapdu[1] -2;
+    uint8_t get_file_apdu[5] = { 0x00, 0xB0, 0x00, 0x02, size };
+    size_t szPos;
+    res = card_transmit(pnd, get_file_apdu, 5, rapdu, &rapdulen);
+    if (res == -1){
+        return -1;
+    }
+    return size;
+}
+
+
+
+int read_ndef(nfc_device *pnd, uint8_t * rapdu ){
+    select_application_id(pnd);
+    select_ndef_file(pnd);
+    return read_ndef_file(pnd, rapdu);
+}
+
+int read_sn(nfc_device *pnd, nfc_target nt, uint8_t * rapdu){
+    uint8_t get_info_apdu[5];
+    size_t rapdulen = 264;
+
+    if (nt.nti.nbi.abtApplicationData[2] <= 2)
+        memcpy(get_info_apdu, "\x80\x01\x00\x00\x35", 5);
+    else
+        memcpy(get_info_apdu, "\x80\x01\x00\x00\x38", 5);
+
+    return card_transmit(pnd, get_info_apdu, 5, rapdu, &rapdulen);
+}
+
+int main(int argc, const char *argv[])
 {
     signal(SIGINT, stop_polling);
 
     // Display libnfc version
     const char *acLibnfcVersion = nfc_version();
 
+    uint8_t capdu[264];
+    uint8_t rapdu[264];
+    size_t rapdulen = 264;
+    size_t ndef_len = 0;
+
     fprintf(stderr, "%s uses libnfc %s\n", argv[0], acLibnfcVersion);
 
-    static const nfc_modulation nmMifare = {
-        .nmt = NMT_ISO14443A,
+    static const nfc_modulation nmVaultIC = {
+        .nmt = NMT_ISO14443B,
         .nbr = NBR_106,
     };
 
@@ -101,7 +199,8 @@ main(int argc, const char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pnd = nfc_open(context, NULL);
+    pnd = nfc_open(context, "pn532_uart:/dev/ttyAMA0");
+
 
     if (pnd == NULL) {
         fprintf(stderr, "Unable to open NFC device.\n");
@@ -126,9 +225,11 @@ main(int argc, const char *argv[])
     }
 
     printf("NFC reader: %s opened\n", nfc_device_get_name(pnd));
+    printf("Starting\n");
     char buffer[10];
-	char *p;
-	char sn_str[23];
+    char *p;
+    char sn_str[23];
+    char ndef_str[50];
 
     for (;;) {
 
@@ -143,23 +244,24 @@ main(int argc, const char *argv[])
             }
         }
 
+        // Try to find a VaultIC tag
+        send_ping();
+        int result = nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
 
-        // Try to find a MIFARE Ultralight tag
-        if (nfc_initiator_select_passive_target(pnd, nmMifare, NULL, 0, &nt) <= 0) {
+        if (result <= 0) {
             usleep(100 * 1000);
+            //fprintf("select passive %d\n",nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt));
             continue;
         }
 
-        // Get the info from the current tag
-        size_t  szPos;
-        p = sn_str;
-        for (szPos = 0; szPos < nt.nti.nai.szUidLen; szPos++) {
-            sprintf(p, "%02X", nt.nti.nai.abtUid[szPos]);
-            p += 2;
-        }
-        *p = 0;
-        fprintf(stderr,"Serial: %s\n",&sn_str[1]);
-        send_tag(sn_str, 2 * nt.nti.nai.szUidLen);
+        if(!read_sn(pnd, nt, rapdu)){
+            memcpy(&sn_str, &rapdu[32], 8);
+            //printf("SN: %s \n", sn_str);
+            //ndef_len = read_ndef(pnd, rapdu);
+            //if(!ndef_len){
+              send_tag(sn_str, 8);
+            //}
+        };
 
         while (0 == nfc_initiator_target_is_present(pnd, NULL)) {}
 
