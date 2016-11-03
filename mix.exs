@@ -8,7 +8,7 @@ defmodule NervesIoNfc.Mixfile do
      name: "nerves_io_nfc",
      description: description(),
      package: package(),
-     source_url: "https://github.com/arjan/nerves_io_nfc",
+     source_url: "https://github.com/ChristopheBelpaire/nerves_io_nfc.git",
      compilers: [:elixir_make] ++ Mix.compilers,
      make_clean: ["clean"],
      build_embedded: Mix.env == :prod,
@@ -30,7 +30,7 @@ defmodule NervesIoNfc.Mixfile do
     %{files: ["lib", "src/*.[ch]", "mix.exs", "README.md", "LICENSE", "Makefile", "*.mk"],
       maintainers: ["Arjan Scherpenisse"],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/arjan/nerves_io_nfc"}}
+      links: %{"GitHub" => "https://github.com/ChristopheBelpaire/nerves_io_nfc.git"}}
   end
 
   defp deps do
