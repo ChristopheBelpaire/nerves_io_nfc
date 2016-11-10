@@ -65,14 +65,16 @@ void erlcmd_send(char *response, size_t len)
 }
 
 
-void send_tag(const char *uid, size_t uid_len) {
+void send_tag(const char *uid, size_t uid_len, char* tag_type) {
     char resp[1024];
     int resp_index = sizeof(uint16_t); // Space for payload size
     ei_encode_version(resp, &resp_index);
 
-    ei_encode_tuple_header(resp, &resp_index, 2);
+    ei_encode_tuple_header(resp, &resp_index, 3);
+
     ei_encode_atom(resp, &resp_index, "tag");
     ei_encode_binary(resp, &resp_index, uid, uid_len);
+    ei_encode_atom(resp, &resp_index, tag_type);
 
     erlcmd_send(resp, resp_index);
 }
@@ -147,7 +149,7 @@ int read_ndef_file(nfc_device *pnd, uint8_t * rapdu) {
     size_t szPos;
     res = card_transmit(pnd, get_file_apdu, 5, rapdu, &rapdulen);
     if (res == -1){
-        return -1;
+        return res;
     }
     return size;
 }
@@ -160,7 +162,7 @@ int read_ndef(nfc_device *pnd, uint8_t * rapdu ){
     return read_ndef_file(pnd, rapdu);
 }
 
-int read_sn(nfc_device *pnd, nfc_target nt, uint8_t * rapdu){
+int read_vault_ic_sn(nfc_device *pnd, nfc_target nt, uint8_t * rapdu){
     uint8_t get_info_apdu[5];
     size_t rapdulen = 264;
 
@@ -170,6 +172,24 @@ int read_sn(nfc_device *pnd, nfc_target nt, uint8_t * rapdu){
         memcpy(get_info_apdu, "\x80\x01\x00\x00\x38", 5);
 
     return card_transmit(pnd, get_info_apdu, 5, rapdu, &rapdulen);
+}
+
+int read_mifare_sn(nfc_device *pnd, nfc_target nt, uint8_t * sn_str){
+
+    char buffer[10];
+    char *p;
+    char sn_str2[23];
+    size_t  szPos;
+    p = sn_str;
+    for (szPos = 0; szPos < nt.nti.nai.szUidLen; szPos++) {
+        sprintf(p, "%02X", nt.nti.nai.abtUid[szPos]);
+        p += 2;
+    }
+    *p = 0;
+
+    memcpy(sn_str, &nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
+    //sn_str = &nt.nti.nai.abtUid;
+    return 0;
 }
 
 int main(int argc, const char *argv[])
@@ -188,6 +208,11 @@ int main(int argc, const char *argv[])
 
     static const nfc_modulation nmVaultIC = {
         .nmt = NMT_ISO14443B,
+        .nbr = NBR_106,
+    };
+
+    static const nfc_modulation nmMifare = {
+        .nmt = NMT_ISO14443A,
         .nbr = NBR_106,
     };
 
@@ -246,22 +271,29 @@ int main(int argc, const char *argv[])
 
         // Try to find a VaultIC tag
         send_ping();
-        int result = nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
+        int mifare_presence = -1;
+        int vault_ic_presence = nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
 
-        if (result <= 0) {
+        if (vault_ic_presence <= 0){
+            mifare_presence = nfc_initiator_select_passive_target(pnd, nmMifare, NULL, 0, &nt);
+        }
+
+        if (vault_ic_presence <= 0 && mifare_presence <=0) {
             usleep(100 * 1000);
             //fprintf("select passive %d\n",nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt));
             continue;
         }
 
-        if(!read_sn(pnd, nt, rapdu)){
+        if(vault_ic_presence == 1 && !read_vault_ic_sn(pnd, nt, rapdu)){
             memcpy(&sn_str, &rapdu[32], 8);
-            //printf("SN: %s \n", sn_str);
-            //ndef_len = read_ndef(pnd, rapdu);
-            //if(!ndef_len){
-              send_tag(sn_str, 8);
-            //}
+            send_tag(sn_str, 8, "VaultIC");
         };
+
+        if(mifare_presence == 1 && !read_mifare_sn(pnd, nt, rapdu)){
+            //memcpy(&sn_str, &rapdu[0], 8);
+            send_tag(rapdu, 7, "Mifare");
+        };
+
 
         while (0 == nfc_initiator_target_is_present(pnd, NULL)) {}
 

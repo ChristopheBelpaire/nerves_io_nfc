@@ -97,23 +97,23 @@ defmodule Nerves.IO.NFC do
     %{state | last_ping: :erlang.system_time}
   end
 
-  defp handle_cmd({:tag, tag}, state = %State{callback: callback}) when is_function(callback) do
-    callback.(tag)
+  defp handle_cmd({:tag, serial_number, tag_type}, state = %State{callback: callback}) when is_function(callback) do
+    callback.(serial_number, tag_type)
     state
   end
 
-  defp handle_cmd({:tag, tag}, state = %State{callback: {m, f}}) do
-    apply(m, f, [tag])
+  defp handle_cmd({:tag, serial_number, tag_type}, state = %State{callback: {m, f}}) do
+    apply(m, f, [serial_number, tag_type])
     state
   end
 
-  defp handle_cmd({:tag, id, ndef}, state = %State{callback: callback}) when is_function(callback) do
-    callback.(id, ndef)
+  defp handle_cmd({:tag, serial_number, ndef, tag_type}, state = %State{callback: callback}) when is_function(callback) do
+    callback.(serial_number, ndef, tag_type)
     state
   end
 
-  defp handle_cmd({:tag, id, ndef }, state = %State{callback: {m, f}}) do
-    apply(m, f, [id, ndef])
+  defp handle_cmd({:tag, serial_number, ndef, tag_type}, state = %State{callback: {m, f}}) do
+    apply(m, f, [serial_number, ndef, tag_type])
     state
   end
 
