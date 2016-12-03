@@ -107,6 +107,16 @@ defmodule Nerves.IO.NFC do
     state
   end
 
+  defp handle_cmd({:tag, serial_number, open_detection_status, open_detection, tag_type}, state = %State{callback: callback}) when is_function(callback) do
+    callback.(serial_number, open_detection_status, open_detection, tag_type)
+    state
+  end
+
+  defp handle_cmd({:tag, serial_number, open_detection_status, open_detection, tag_type}, state = %State{callback: {m, f}}) do
+    apply(m, f, [serial_number, open_detection_status, open_detection, tag_type])
+    state
+  end
+
   defp handle_cmd({:tag, serial_number, ndef, tag_type}, state = %State{callback: callback}) when is_function(callback) do
     callback.(serial_number, ndef, tag_type)
     state

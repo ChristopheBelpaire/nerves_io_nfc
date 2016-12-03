@@ -64,7 +64,7 @@ void erlcmd_send(char *response, size_t len)
     } while (wrote < len);
 }
 
-
+/*
 void send_tag(const char *uid, size_t uid_len, char* tag_type) {
     char resp[1024];
     int resp_index = sizeof(uint16_t); // Space for payload size
@@ -74,6 +74,23 @@ void send_tag(const char *uid, size_t uid_len, char* tag_type) {
 
     ei_encode_atom(resp, &resp_index, "tag");
     ei_encode_binary(resp, &resp_index, uid, uid_len);
+    ei_encode_binary(resp, &resp_index, tag_type);
+
+    erlcmd_send(resp, resp_index);
+}*/
+
+void send_tag(const char *uid, size_t uid_len, uint8_t open_detection_status, uint8_t open_detection, char* tag_type) {
+    char resp[1024];
+    int resp_index = sizeof(uint16_t); // Space for payload size
+    ei_encode_version(resp, &resp_index);
+
+    ei_encode_tuple_header(resp, &resp_index, 5);
+
+    ei_encode_atom(resp, &resp_index, "tag");
+    ei_encode_binary(resp, &resp_index, uid, uid_len);
+    ei_encode_boolean(resp, &resp_index, open_detection_status);
+    ei_encode_boolean(resp, &resp_index, open_detection);
+
     ei_encode_atom(resp, &resp_index, tag_type);
 
     erlcmd_send(resp, resp_index);
@@ -286,12 +303,12 @@ int main(int argc, const char *argv[])
 
         if(vault_ic_presence == 1 && !read_vault_ic_sn(pnd, nt, rapdu)){
             memcpy(&sn_str, &rapdu[32], 8);
-            send_tag(sn_str, 8, "VaultIC");
+            send_tag(sn_str, 8, rapdu[53], rapdu[54], "VaultIC");
         };
 
         if(mifare_presence == 1 && !read_mifare_sn(pnd, nt, rapdu)){
             //memcpy(&sn_str, &rapdu[0], 8);
-            send_tag(rapdu, 7, "Mifare");
+            send_tag(rapdu, 7, 0, 0,"Mifare");
         };
 
 
