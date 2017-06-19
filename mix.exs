@@ -27,7 +27,7 @@ defmodule NervesIoNfc.Mixfile do
   end
 
   defp package do
-    %{files: ["lib", "src/*.[ch]", "mix.exs", "README.md", "LICENSE", "Makefile", "*.mk"],
+    %{files: ["lib", "src/*.[ch]", "mix.exs", "README.md", "LICENSE", "Makefile", "*.mk", "priv/*"],
       maintainers: ["Arjan Scherpenisse"],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/ChristopheBelpaire/nerves_io_nfc.git"}}
