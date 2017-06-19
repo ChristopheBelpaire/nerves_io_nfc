@@ -16,7 +16,7 @@ include portdrv.mk
 
 nfc_poller_sources = src/main.o
 
-all: deps priv/nfc_poller
+all: #deps priv/nfc_poller
 
 libnfc_url := "https://bintray.com/nfc-tools/sources/download_file?file_path=libnfc-1.7.1.tar.bz2"
 libnfc_tar := libnfc-1.7.1.tar.bz2
