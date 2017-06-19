@@ -9,20 +9,20 @@ defmodule Nerves.IO.NFC do
 
   require Logger
 
-  def start_link(callback) do
-    GenServer.start_link(__MODULE__, [callback], name: __MODULE__)
+  def start_link(callback, nfc_poller) do
+    GenServer.start_link(__MODULE__, [callback, nfc_poller], name: __MODULE__)
   end
 
 
   defmodule State do
     @moduledoc false
-    defstruct port: nil, callback: nil, last_ping: nil
+    defstruct port: nil, callback: nil, last_ping: nil, nfc_poller: nil
   end
 
-  def init([callback]) do
+  def init([callback, nfc_poller]) do
     Logger.info "NFC worker starting"
     Process.send_after(self(), {:ping, self}, 1_000)
-    state = %State{callback: callback}
+    state = %State{callback: callback, nfc_poller: nfc_poller}
     {:ok, state, 0}
   end
 
@@ -72,7 +72,7 @@ defmodule Nerves.IO.NFC do
 
 
   defp restart(state) do
-    executable = :code.priv_dir(:nerves_io_nfc) ++ '/nfc_poller'
+    executable = :code.priv_dir(:nerves_io_nfc)++'/'++state.nfc_poller
     port = Port.open({:spawn_executable, executable},
                      [{:args, []},
                       {:packet, 2},
