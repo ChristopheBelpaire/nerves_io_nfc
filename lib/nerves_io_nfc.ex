@@ -20,6 +20,7 @@ defmodule Nerves.IO.NFC do
   end
 
   def init([callback, nfc_poller]) do
+
     Logger.info "NFC worker starting"
     Process.send_after(self(), {:ping, self}, 1_000)
     state = %State{callback: callback, nfc_poller: nfc_poller}
@@ -72,7 +73,8 @@ defmodule Nerves.IO.NFC do
 
 
   defp restart(state) do
-    executable = :code.priv_dir(:nerves_io_nfc)++ to_char_list("/#{state.nfc_poller}"}
+    System.cmd ("killall", [state.nfc_poller])
+    executable = :code.priv_dir(:nerves_io_nfc)++ to_char_list("/#{state.nfc_poller}")
     port = Port.open({:spawn_executable, executable},
                      [{:args, []},
                       {:packet, 2},
