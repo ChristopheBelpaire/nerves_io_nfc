@@ -72,7 +72,7 @@ defmodule Nerves.IO.NFC do
 
 
   defp restart(state) do
-    executable = :code.priv_dir(:nerves_io_nfc)++'/'++state.nfc_poller
+    executable = :code.priv_dir(:nerves_io_nfc)++ to_char_list("/#{state.nfc_poller}"}
     port = Port.open({:spawn_executable, executable},
                      [{:args, []},
                       {:packet, 2},
