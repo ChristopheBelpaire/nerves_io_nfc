@@ -121,7 +121,7 @@ void send_tag(const char *uid, size_t uid_len, char *ndef, size_t ndef_len) {
 int card_transmit(nfc_device *pnd, uint8_t * capdu, size_t capdulen, uint8_t * rapdu, size_t * rapdulen)
 {
   size_t  szPos;
-  int retry = 3;
+  int retry = 1;
   int res = 0;
   while ((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1) < 0) && (retry > 0)) {
     printf("RETRY\n");
