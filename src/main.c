@@ -191,7 +191,9 @@ int read_vault_ic_sn(nfc_device *pnd, nfc_target nt, uint8_t * rapdu){
     return card_transmit(pnd, get_info_apdu, 5, rapdu, &rapdulen);
 }
 
-int read_mifare_sn(nfc_device *pnd, nfc_target nt, uint8_t * sn_str){
+int read_mifare_sn(nfc_device *pnd, nfc_target nt, uint8_t * sn_str, int * opening_detection, int * opening_detection_status){
+    uint8_t rapdu[264];
+    size_t rapdulen = 264;
 
     char buffer[10];
     char *p;
@@ -205,8 +207,26 @@ int read_mifare_sn(nfc_device *pnd, nfc_target nt, uint8_t * sn_str){
     *p = 0;
 
     memcpy(sn_str, &nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
-    //sn_str = &nt.nti.nai.abtUid;
-    return 0;
+
+    uint8_t read_page[2]= {0x30, 0x29};
+    card_transmit(pnd, read_page, 2, rapdu, &rapdulen);
+
+     int openFlagPosition = ((rapdu[2] * 4) + ((rapdu[1] && 0b00110000) >> 4) + 15);
+     int openFlagPage = openFlagPosition / 4;
+     int openFlagByte = openFlagPosition % 4;
+     
+     uint8_t read_opening_page[2] = {0x30, openFlagPage};
+     card_transmit(pnd, read_opening_page, 2, rapdu, &rapdulen);
+     *opening_detection = 1;
+     if( rapdu[openFlagByte] == 0x30){
+         *opening_detection_status = 0;
+      }else{
+         *opening_detection_status = 1;
+      }
+     
+     //memcpy(get_info_apdu, "\x80\x01\x00\x00\x35", 5);
+     //sn_str = &nt.nti.nai.abtUid;
+     return 0;
 }
 
 int main(int argc, const char *argv[])
@@ -241,7 +261,7 @@ int main(int argc, const char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pnd = nfc_open(context, "pn532_uart:/dev/ttyAMA0");
+    pnd = nfc_open(context, "pn532_i2c:/dev/i2c-1");
 
 
     if (pnd == NULL) {
@@ -288,6 +308,8 @@ int main(int argc, const char *argv[])
 
         // Try to find a VaultIC tag
         send_ping();
+        int opening_detection = 0;
+        int opening_detection_status = 1;
         int mifare_presence = -1;
         int vault_ic_presence = nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
 
@@ -306,9 +328,9 @@ int main(int argc, const char *argv[])
             send_tag(sn_str, 8, rapdu[53], rapdu[54], "VaultIC");
         };
 
-        if(mifare_presence == 1 && !read_mifare_sn(pnd, nt, rapdu)){
+        if(mifare_presence == 1 && !read_mifare_sn(pnd, nt, rapdu, &opening_detection, &opening_detection_status)){
             //memcpy(&sn_str, &rapdu[0], 8);
-            send_tag(rapdu, 7, 0, 0,"Mifare");
+            send_tag(rapdu, 7, opening_detection, opening_detection_status, "Sic43NT");
         };
 
 
