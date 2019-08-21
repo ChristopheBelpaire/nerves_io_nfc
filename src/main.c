@@ -209,11 +209,11 @@ int read_mifare_sn(nfc_device *pnd, nfc_target nt, uint8_t * sn_str, int * openi
     memcpy(sn_str, &nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
 
     uint8_t read_page[2]= {0x30, 0x29};
-    card_transmit(pnd, read_page, 2, rapdu, &rapdulen);
+    //card_transmit(pnd, read_page, 2, rapdu, &rapdulen);
 
-     int openFlagPosition = ((rapdu[2] * 4) + ((rapdu[1] && 0b00110000) >> 4) + 15);
-     int openFlagPage = openFlagPosition / 4;
-     int openFlagByte = openFlagPosition % 4;
+    // int openFlagPosition = ((rapdu[2] * 4) + ((rapdu[1] && 0b00110000) >> 4) + 15);
+     int openFlagPage = 16; //openFlagPosition / 4;
+     int openFlagByte = 3; //openFlagPosition % 4;
      
      uint8_t read_opening_page[2] = {0x30, openFlagPage};
      card_transmit(pnd, read_opening_page, 2, rapdu, &rapdulen);
@@ -311,11 +311,11 @@ int main(int argc, const char *argv[])
         int opening_detection = 0;
         int opening_detection_status = 1;
         int mifare_presence = -1;
-        int vault_ic_presence = nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
+        int vault_ic_presence = 0; //nfc_initiator_select_passive_target(pnd, nmVaultIC, NULL, 0, &nt);
 
-        if (vault_ic_presence <= 0){
+      //  if (vault_ic_presence <= 0){
             mifare_presence = nfc_initiator_select_passive_target(pnd, nmMifare, NULL, 0, &nt);
-        }
+      //  }
 
         if (vault_ic_presence <= 0 && mifare_presence <=0) {
             usleep(100 * 1000);
